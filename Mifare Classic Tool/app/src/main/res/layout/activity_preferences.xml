@@ -209,6 +209,24 @@
             </RelativeLayout>
 
             <RelativeLayout
+                android:id="@+id/relativeLayoutPreferencesUseSortKeyFileOnly"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@xml/layout_border"
+                android:padding="2dp"
+                android:layout_marginBottom="5dp">
+
+                <CheckBox
+                    android:id="@+id/checkBoxPreferencesUseSortKeyFileOnly"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:layout_centerVertical="true"
+                    android:text="@string/action_use_sorted_key" />
+
+            </RelativeLayout>
+
+            <RelativeLayout
                 android:id="@+id/relativeLayoutPreferencesCopyUID"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -21,6 +21,7 @@ package de.syss.MifareClassicTool.Activities;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -44,6 +45,7 @@ public class Preferences extends BasicActivity {
      */
     public enum Preference {
         AutoReconnect("auto_reconnect"),
+        UseSortedKeyFile("use_sorted_key_file"),
         AutoCopyUID("auto_copy_uid"),
         UIDFormat("uid_format"),
         SaveLastUsedKeyFiles("save_last_used_key_files"),
@@ -60,6 +62,7 @@ public class Preferences extends BasicActivity {
             this.text = text;
         }
 
+        @NonNull
         @Override
         public String toString() {
             return text;
@@ -67,6 +70,7 @@ public class Preferences extends BasicActivity {
     }
 
     private CheckBox mPrefAutoReconnect;
+    private CheckBox mPrefUseSortedKey;
     private CheckBox mPrefAutoCopyUID;
     private CheckBox mPrefSaveLastUsedKeyFiles;
     private CheckBox mUseCustomSectorCount;
@@ -87,6 +91,8 @@ public class Preferences extends BasicActivity {
         // Get preferences (init. the member variables).
         mPrefAutoReconnect = findViewById(
                 R.id.checkBoxPreferencesAutoReconnect);
+        mPrefUseSortedKey = findViewById(
+                R.id.checkBoxPreferencesUseSortKeyFileOnly);
         mPrefAutoCopyUID = findViewById(
                 R.id.checkBoxPreferencesCopyUID);
         mPrefSaveLastUsedKeyFiles = findViewById(
@@ -106,6 +112,8 @@ public class Preferences extends BasicActivity {
         SharedPreferences pref = Common.getPreferences();
         mPrefAutoReconnect.setChecked(pref.getBoolean(
                 Preference.AutoReconnect.toString(), false));
+        mPrefUseSortedKey.setChecked(pref.getBoolean(
+                Preference.UseSortedKeyFile.toString(), false));
         mPrefAutoCopyUID.setChecked(pref.getBoolean(
                 Preference.AutoCopyUID.toString(), false));
         setUIDFormatBySequence(pref.getInt(Preference.UIDFormat.toString(),0));
@@ -297,6 +305,8 @@ public class Preferences extends BasicActivity {
         SharedPreferences.Editor edit = Common.getPreferences().edit();
         edit.putBoolean(Preference.AutoReconnect.toString(),
                 mPrefAutoReconnect.isChecked());
+        edit.putBoolean(Preference.UseSortedKeyFile.toString(),
+                mPrefUseSortedKey.isChecked());
         edit.putBoolean(Preference.AutoCopyUID.toString(),
                 mPrefAutoCopyUID.isChecked());
         edit.putInt(Preference.UIDFormat.toString(),getUIDFormatSequence());
