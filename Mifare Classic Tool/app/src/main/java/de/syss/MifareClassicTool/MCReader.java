@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -521,94 +522,143 @@ public class MCReader {
                 mKeyMap = new SparseArray<>();
             }
 
-            // Get auto reconnect setting.
-            boolean autoReconnect = Common.getPreferences().getBoolean(
-                    Preference.AutoReconnect.toString(), false);
-            // Get retry authentication option.
-            boolean retryAuth = Common.getPreferences().getBoolean(
-                    Preference.UseRetryAuthentication.toString(), false);
-            int retryAuthCount = Common.getPreferences().getInt(
-                    Preference.RetryAuthenticationCount.toString(), 1);
+            if (!Common.getPreferences().getBoolean(Preference.UseSortedKeyFile.toString(), false)) {
+                // Get auto reconnect setting.
+                boolean autoReconnect = Common.getPreferences().getBoolean(
+                        Preference.AutoReconnect.toString(), false);
+                // Get retry authentication option.
+                boolean retryAuth = Common.getPreferences().getBoolean(
+                        Preference.UseRetryAuthentication.toString(), false);
+                int retryAuthCount = Common.getPreferences().getInt(
+                        Preference.RetryAuthenticationCount.toString(), 1);
 
-            byte[][] keys = new byte[2][];
-            boolean[] foundKeys = new boolean[] {false, false};
-            boolean auth;
+                byte[][] keys = new byte[2][];
+                boolean[] foundKeys = new boolean[]{false, false};
+                boolean auth;
 
-            // Check next sector against all keys (lines) with
-            // authentication method A and B.
-            keysloop:
-            for (int i = 0; i < mKeysWithOrder.size(); i++) {
-                byte[] key = mKeysWithOrder.get(i);
-                for (int j = 0; j < retryAuthCount+1;) {
-                    try {
-                        if (!foundKeys[0]) {
-                            auth = mMFC.authenticateSectorWithKeyA(
-                                    mKeyMapStatus, key);
-                            if (auth) {
-                                keys[0] = key;
-                                foundKeys[0] = true;
-                            }
-                        }
-                        if (!foundKeys[1]) {
-                            auth = mMFC.authenticateSectorWithKeyB(
-                                    mKeyMapStatus, key);
-                            if (auth) {
-                                keys[1] = key;
-                                foundKeys[1] = true;
-                            }
-                        }
-                    } catch (Exception e) {
-                        Log.d(LOG_TAG,
-                                "Error while building next key map part");
-                        // Is auto reconnect enabled?
-                        if (autoReconnect) {
-                            Log.d(LOG_TAG, "Auto reconnect is enabled");
-                            while (!isConnected()) {
-                                // Sleep for 500ms.
-                                try {
-                                    Thread.sleep(500);
-                                } catch (InterruptedException ex) {
-                                    // Do nothing.
-                                }
-                                // Try to reconnect.
-                                try {
-                                    connect();
-                                } catch (Exception ex) {
-                                    // Do nothing.
+                // Check next sector against all keys (lines) with
+                // authentication method A and B.
+                keysloop:
+                for (int i = 0; i < mKeysWithOrder.size(); i++) {
+                    byte[] key = mKeysWithOrder.get(i);
+                    for (int j = 0; j < retryAuthCount + 1; ) {
+                        try {
+                            if (!foundKeys[0]) {
+                                auth = mMFC.authenticateSectorWithKeyA(
+                                        mKeyMapStatus, key);
+                                if (auth) {
+                                    keys[0] = key;
+                                    foundKeys[0] = true;
                                 }
                             }
-                            // Repeat last loop (do not incr. j).
-                            continue;
-                        } else {
-                            error = true;
-                            break keysloop;
+                            if (!foundKeys[1]) {
+                                auth = mMFC.authenticateSectorWithKeyB(
+                                        mKeyMapStatus, key);
+                                if (auth) {
+                                    keys[1] = key;
+                                    foundKeys[1] = true;
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.d(LOG_TAG,
+                                    "Error while building next key map part");
+                            // Is auto reconnect enabled?
+                            if (autoReconnect) {
+                                Log.d(LOG_TAG, "Auto reconnect is enabled");
+                                while (!isConnected()) {
+                                    // Sleep for 500ms.
+                                    try {
+                                        Thread.sleep(500);
+                                    } catch (InterruptedException ex) {
+                                        // Do nothing.
+                                    }
+                                    // Try to reconnect.
+                                    try {
+                                        connect();
+                                    } catch (Exception ex) {
+                                        // Do nothing.
+                                    }
+                                }
+                                // Repeat last loop (do not incr. j).
+                                continue;
+                            } else {
+                                error = true;
+                                break keysloop;
+                            }
                         }
+                        // Retry?
+                        if ((foundKeys[0] && foundKeys[1]) || !retryAuth) {
+                            // Both keys found or no retry wanted. Stop retrying.
+                            break;
+                        }
+                        j++;
                     }
-                    // Retry?
-                    if((foundKeys[0] && foundKeys[1]) || !retryAuth) {
-                        // Both keys found or no retry wanted. Stop retrying.
+                    // Next key?
+                    if ((foundKeys[0] && foundKeys[1])) {
+                        // Both keys found. Stop searching for keys.
                         break;
                     }
-                    j++;
                 }
-                // Next key?
-                if ((foundKeys[0] && foundKeys[1])) {
-                    // Both keys found. Stop searching for keys.
-                    break;
+                if (!error && (foundKeys[0] || foundKeys[1])) {
+                    // At least one key found. Add key(s).
+                    mKeyMap.put(mKeyMapStatus, keys);
+                    // Key reuse is very likely, so try these first
+                    // for the next sector.
+                    if (foundKeys[0]) {
+                        mKeysWithOrder.remove(keys[0]);
+                        mKeysWithOrder.add(0, keys[0]);
+                    }
+                    if (foundKeys[1]) {
+                        mKeysWithOrder.remove(keys[1]);
+                        mKeysWithOrder.add(0, keys[1]);
+                    }
                 }
-            }
-            if (!error && (foundKeys[0] || foundKeys[1])) {
-                // At least one key found. Add key(s).
-                mKeyMap.put(mKeyMapStatus, keys);
-                // Key reuse is very likely, so try these first
-                // for the next sector.
-                if (foundKeys[0]) {
-                    mKeysWithOrder.remove(keys[0]);
-                    mKeysWithOrder.add(0, keys[0]);
-                }
-                if (foundKeys[1]) {
-                    mKeysWithOrder.remove(keys[1]);
-                    mKeysWithOrder.add(0, keys[1]);
+            } else {
+                try {
+                    byte[][] keys = new byte[2][];
+                    boolean auth;
+
+                    byte[] key = mKeysWithOrder.remove(0);
+                    auth = mMFC.authenticateSectorWithKeyA(mKeyMapStatus, key);
+                    if (auth) {
+                        keys[0] = key;
+                        Log.i("MFD", "第 " + mKeyMapStatus + " 區 keyA = " + Common.byte2HexString(key));
+//                        try {
+//                            Log.i("MFD",
+//                                    "\n" + Common.byte2HexString(mMFC.readBlock(mKeyMapStatus * 4))
+//                                            + "\n" + Common.byte2HexString(mMFC.readBlock(mKeyMapStatus * 4 + 1))
+//                                            + "\n" + Common.byte2HexString(mMFC.readBlock(mKeyMapStatus * 4 + 2))
+//                                            + "\n" + Common.byte2HexString(mMFC.readBlock(mKeyMapStatus * 4 + 3))
+//                            );
+//                        } catch (Exception e) {
+//                            Log.e("MFD", "讀取失敗 : " + e.getClass());
+//                        }
+                    } else {
+                        Log.i("MFD", "第 " + mKeyMapStatus + " 區 keyA 認證失敗 (" + Common.byte2HexString(key) + ")");
+                    }
+
+                    key = mKeysWithOrder.remove(0);
+                    auth = mMFC.authenticateSectorWithKeyB(mKeyMapStatus, key);
+                    if (auth) {
+                        try {
+                            mMFC.readBlock(mKeyMapStatus * 4);
+                        } catch (Exception e) {
+                            auth = false;
+                        }
+                    }
+
+                    if (auth) {
+                        keys[1] = key;
+                        Log.i("MFD", "第 " + mKeyMapStatus + " 區 keyB = " + Common.byte2HexString(key));
+                    } else {
+                        Log.i("MFD", "第 " + mKeyMapStatus + " 區 keyB 認證失敗 (" + Common.byte2HexString(key) + ")");
+                    }
+
+                    mKeyMap.put(mKeyMapStatus, keys);
+                } catch (Exception e) {
+                    Log.d(LOG_TAG, "Error while building next key map part");
+                    // Is auto reconnect enabled?
+                    error = true;
                 }
             }
             mKeyMapStatus++;
@@ -850,7 +900,11 @@ public class MCReader {
      * on error (out of memory).
      */
     public boolean setKeyFile(File[] keyFiles, Context context) {
-        HashSet<byte[]> keys = new HashSet<>();
+        Collection<byte[]> keys;
+        if (Common.getPreferences().getBoolean(Preference.UseSortedKeyFile.toString(), false))
+            keys = new ArrayList<>();
+        else
+            keys = new HashSet<>();
         for (File file : keyFiles) {
             String[] lines = Common.readFileLineByLine(file, false, context);
             if (lines != null) {
