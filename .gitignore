@@ -4,6 +4,7 @@ Mifare Classic Tool/doc/
 # Andoird Studio stuff
 Mifare Classic Tool/**/*.iml
 Mifare Classic Tool/.gradle
+/.gradle
 Mifare Classic Tool/local.properties
 Mifare Classic Tool/.idea/
 Mifare Classic Tool/**/build
